@@ -13,14 +13,24 @@ The script will take input on what State, Front End Server, and whether to inclu
 .NOTES
 Created by James Rogers
 
+01/11/2017 - Updated dataset, and paramaters
+
 #>
 
-param([string]$state,[string]$feserver,[switch]$includenat)
-$i = 1
-$year = @()
-Write-Host -ForegroundColor Green -BackgroundColor Black "Building Holidays for" $state `n
-Write-Host -ForegroundColor Green -BackgroundColor Black "On the Front end Server" $feserver `n
-Write-Host -ForegroundColor Green -BackgroundColor Black "Copy and paste this script and run on the front end server" `n
+[CmdletBinding()] 
+param( 
+  [Parameter(Mandatory=$true)] 
+  [ValidateSet("WA","NSW","VIC","QLD","NT","ACT","SA","TAS")]
+  [string]$state,
+  
+  [Parameter(Mandatory=$true)]
+  [string]$feserver,
+
+  [Parameter(Mandatory=$false)] 
+  [switch]$includenat = $true
+)
+
+#---------------------------------------------------------[Initialisations]--------------------------------------------------------
 function Convert-DateString ([string]$Date,[string[]]$Format) {
   $result = New-Object DateTime
   $convertible = [datetime]::TryParseExact(
@@ -32,25 +42,40 @@ function Convert-DateString ([string]$Date,[string[]]$Format) {
   if ($convertible) { $result }
 }
 
+#----------------------------------------------------------[Declarations]----------------------------------------------------------
+#ensure variables are blank
+$i = 1
+$year = @()
+
 #get data from govement
-$request = 'http://data.gov.au/datastore/odata3.0/a24ecaf2-044a-4e66-989c-eacc81ded62f?$format=json'
+#for up to date info on the API go to; https://data.gov.au/dataset/australian-holidays-machine-readable-dataset
+$request = 'http://data.gov.au/api/3/action/datastore_search?resource_id=a24ecaf2-044a-4e66-989c-eacc81ded62f'
+
+#---------------------------------------------------------[Main Execution]---------------------------------------------------------
+
+Write-Host -ForegroundColor Green -BackgroundColor Black "Building Holidays for" $state `n
+Write-Host -ForegroundColor Green -BackgroundColor Black "On the Front end Server" $feserver `n
+Write-Host -ForegroundColor Green -BackgroundColor Black "Copy and paste this script and run on the front end server" `n
+
+#hit gov api get databack as json and convert
 $json = Invoke-WebRequest $request | ConvertFrom-Json
 
-#attempt to format data
+#try get data applicable to specified state, and national if included.
 if ($includenat) {
-  $outvalue = $json.value | Where-Object { $_."Applicable To" -match $state -or $_."Applicable To" -match 'NAT' } | Select-Object Date,"Holiday Name"
+  $outvalue = $json.result.records | Where-Object { $_."Applicable To" -match $state -or $_."Applicable To" -match 'NAT' } | Select-Object Date,"Holiday Name"
 }
 else {
-  $outvalue = $json.value | Where-Object { $_."Applicable To" -match $state } | Select-Object Date,"Holiday Name"
+  $outvalue = $json.result.records | Where-Object { $_."Applicable To" -match $state } | Select-Object Date,"Holiday Name"
 }
+
+#write read if nothing is returned
 if (($outvalue).count -lt 1) {
-  Write-Host -ForegroundColor Red "No Data Returned"
-  Write-Host -ForegroundColor Red "Data returned" $json
-  Write-Host -ForegroundColor Red "Data selected" $outvalue
+  Write-Error "No Data Returned"
+  Write-Error "Data returned $json"
+  Write-Error "Data selected $outvalue"
 }
 
 else {
-
   #format each holiday
   $outvalue | ForEach-Object {
     $number = $i
