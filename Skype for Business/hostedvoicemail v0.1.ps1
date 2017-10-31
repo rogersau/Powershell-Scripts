@@ -43,7 +43,6 @@ $users = Get-ADUser -LdapFilter "(&(objectCategory=person)(objectClass=user)(!us
 
 #loop of users returned from AD
 foreach ($user in $users) {
-  #append govnet\ to sam
   $sam = $user.SamAccountName
   $upn = $user.UserPrincipalName
   #try get the user first
